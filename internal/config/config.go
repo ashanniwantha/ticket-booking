@@ -1,0 +1,102 @@
+package config
+
+import (
+	"fmt"
+	"log"
+	"os"
+	"strconv"
+	"time"
+
+	"github.com/joho/godotenv"
+)
+
+type Config struct {
+	AppEnv              string
+	AppPort             int
+	DBHost              string
+	DBPort              int
+	DBUser              string
+	DBPassword          string
+	DBName              string
+	DBMaxConns          int
+	DBMinConns          int
+	DBMaxConnLifetime   time.Duration
+	DBMaxConnIdleTime   time.Duration
+	DBHealthCheckPeriod time.Duration
+	RedisHost           string
+	RedisPort           int
+	RedisPassword       string
+	JWTSecret           string
+}
+
+func LoadConfig() (*Config, error) {
+	// Load .env if present; ignore error in production (file absent)
+	if err := godotenv.Load(); err != nil {
+		log.Println("No .env file found, reading from system environment variables")
+	}
+
+	cfg := &Config{
+		AppEnv:  getEnv("APP_ENV", "production"),
+		AppPort: getEnvAsInt("APP_PORT", 8008),
+
+		// Database
+		DBHost:     getEnv("DB_HOST", "localhost"),
+		DBPort:     getEnvAsInt("DB_PORT", 5432),
+		DBUser:     getEnv("DB_USER", "ticketuser"),
+		DBPassword: os.Getenv("DB_PASSWORD"),
+		DBName:     getEnv("DB_NAME", "ticketbook"),
+
+		// Pool
+		DBMaxConns:          getEnvAsInt("DB_MAX_CONNS", 20),
+		DBMinConns:          getEnvAsInt("DB_MIN_CONNS", 5),
+		DBMaxConnLifetime:   getEnvAsDuration("DB_MAX_CONN_LIFETIME", 30*time.Minute),
+		DBMaxConnIdleTime:   getEnvAsDuration("DB_MAX_CONN_IDLE_TIME", 5*time.Minute),
+		DBHealthCheckPeriod: getEnvAsDuration("DB_HEALTH_CHECK_PERIOD", 1*time.Minute),
+
+		// Redis
+		RedisHost:     getEnv("REDIS_HOST", "localhost"),
+		RedisPort:     getEnvAsInt("REDIS_PORT", 6379),
+		RedisPassword: os.Getenv("REDIS_PASSWORD"),
+
+		JWTSecret: os.Getenv("JWT_SECRET"),
+	}
+
+	if cfg.DBPassword == "" {
+		return nil, fmt.Errorf("DB_PASSWORD is required but not set")
+	}
+	if cfg.JWTSecret == "" {
+		return nil, fmt.Errorf("JWT_SECRET is required but not set")
+	}
+
+	return cfg, nil
+}
+
+func getEnv(key, fallback string) string {
+	if value, exists := os.LookupEnv(key); exists {
+		return value
+	}
+	return fallback
+}
+
+func getEnvAsInt(key string, fallback int) int {
+	valueStr := getEnv(key, "")
+	value, err := strconv.Atoi(valueStr)
+	if err != nil {
+		return fallback
+	}
+
+	if value < 0 {
+		return fallback
+	}
+
+	return value
+}
+
+func getEnvAsDuration(key string, fallback time.Duration) time.Duration {
+	valueStr := getEnv(key, "")
+	value, err := time.ParseDuration(valueStr)
+	if err != nil {
+		return fallback
+	}
+	return value
+}
