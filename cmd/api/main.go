@@ -3,18 +3,33 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/ashanniwantha/ticket-booking/internal/config"
 	"github.com/ashanniwantha/ticket-booking/internal/database"
+	"github.com/ashanniwantha/ticket-booking/internal/handler"
+	"github.com/ashanniwantha/ticket-booking/internal/logger"
+	"github.com/go-chi/chi/v5"
 )
 
 func main() {
+	// load env config
 	cfg, err := config.LoadConfig()
 	if err != nil {
-		log.Fatalf("Configuration error: %v", err)
+		fmt.Fprintf(os.Stderr, "Configuration error: %v\n", err)
+		os.Exit(1)
 	}
 
+	log := logger.New(cfg.AppEnv)
+	log.Info("starting application", "env", cfg.AppEnv, "port", cfg.AppPort)
+	fmt.Printf("Database URL target: postgres://%s:***@%s:%d/%s\n",
+		cfg.DBUser, cfg.DBHost, cfg.DBPort, cfg.DBName)
+
+	// Database pool
 	dsn := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable",
 		cfg.DBUser, cfg.DBPassword, cfg.DBHost, cfg.DBPort, cfg.DBName)
 
@@ -25,17 +40,57 @@ func main() {
 		MaxConnLifetime:   cfg.DBMaxConnLifetime,
 		MaxConnIdleTime:   cfg.DBMaxConnIdleTime,
 		HealthCheckPeriod: cfg.DBHealthCheckPeriod,
+		ConnectTimeout:    cfg.DBConnectTimeout,
+		PingTimeout:       cfg.DBPingTimeout,
 	}
 
 	pool, err := database.NewPool(context.Background(), dbCfg)
 	if err != nil {
-		log.Fatalf("failed initialize database: %s", err)
+		log.Error("failed initialize database", "err", err)
+		os.Exit(1)
 	}
 	defer pool.Close()
 
-	log.Printf("Database connected - %s mode", cfg.AppEnv)
+	log.Info("Database connected", "mode", cfg.AppEnv)
 
-	log.Printf("Starting application in [%s] mode...", cfg.AppEnv)
-	fmt.Printf("Database URL target: postgres://%s:***@%s:%d/%s\n",
-		cfg.DBUser, cfg.DBHost, cfg.DBPort, cfg.DBName)
+	// Handlers
+	healthH := handler.NewHealthHandler(pool, log)
+
+	// Chi Router
+	r := chi.NewRouter()
+	r.Get("/health", healthH.Ping())
+
+	// HTTP server with timeouts
+	srv := &http.Server{
+		Addr:         fmt.Sprintf(":%d", cfg.AppPort),
+		Handler:      r,
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+
+	// Start server
+	go func() {
+		log.Info("server starting", "addr", srv.Addr)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Error("server error", "err", err)
+			os.Exit(1)
+		}
+	}()
+
+	// Graceful Shutdown
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	sig := <-quit
+	log.Info("shutting down", "signal", sig.String())
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Error("forced shutdown", "err", err)
+	}
+
+	log.Info("server stopped")
+
 }

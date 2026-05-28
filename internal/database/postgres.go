@@ -15,6 +15,8 @@ type PoolConfig struct {
 	MaxConnLifetime   time.Duration
 	MaxConnIdleTime   time.Duration
 	HealthCheckPeriod time.Duration
+	ConnectTimeout    time.Duration
+	PingTimeout       time.Duration
 }
 
 func NewPool(ctx context.Context, cfg PoolConfig) (*pgxpool.Pool, error) {
@@ -28,12 +30,17 @@ func NewPool(ctx context.Context, cfg PoolConfig) (*pgxpool.Pool, error) {
 	poolConfig.MaxConnLifetime = cfg.MaxConnLifetime     // recycle connections older than this
 	poolConfig.MaxConnIdleTime = cfg.MaxConnIdleTime     // close connections idle for this long
 	poolConfig.HealthCheckPeriod = cfg.HealthCheckPeriod // background health checks
+	poolConfig.ConnConfig.ConnectTimeout = cfg.ConnectTimeout
 
 	pool, err := pgxpool.NewWithConfig(ctx, poolConfig)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create connection pool: %w", err)
 	}
-	if err := pool.Ping(ctx); err != nil {
+
+	pingCtx, cancel := context.WithTimeout(ctx, cfg.PingTimeout)
+	defer cancel()
+
+	if err := pool.Ping(pingCtx); err != nil {
 		pool.Close()
 		return nil, fmt.Errorf("unable to ping database: %w", err)
 	}
