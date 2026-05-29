@@ -35,7 +35,9 @@ type Config struct {
 	RedisPort     int
 	RedisPassword string
 
-	JWTSecret string
+	// Security
+	JWTSecret     string
+	JWTExpiration time.Duration
 }
 
 func LoadConfig() (*Config, error) {
@@ -69,7 +71,9 @@ func LoadConfig() (*Config, error) {
 		RedisPort:     getEnvAsInt("REDIS_PORT", 6379),
 		RedisPassword: os.Getenv("REDIS_PASSWORD"),
 
-		JWTSecret: os.Getenv("JWT_SECRET"),
+		// Security
+		JWTSecret:     os.Getenv("JWT_SECRET"),
+		JWTExpiration: getEnvAsDuration("JWTExpiration", 60*time.Minute),
 	}
 
 	if cfg.DBPassword == "" {

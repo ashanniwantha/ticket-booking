@@ -9,10 +9,13 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ashanniwantha/ticket-booking/internal/auth"
 	"github.com/ashanniwantha/ticket-booking/internal/config"
 	"github.com/ashanniwantha/ticket-booking/internal/database"
 	"github.com/ashanniwantha/ticket-booking/internal/handler"
 	"github.com/ashanniwantha/ticket-booking/internal/logger"
+	"github.com/ashanniwantha/ticket-booking/internal/repository/postgres"
+	"github.com/ashanniwantha/ticket-booking/internal/service"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -53,12 +56,20 @@ func main() {
 
 	log.Info("Database connected", "mode", cfg.AppEnv)
 
-	// Handlers
+	// --- User components ---
+	tokenGen := auth.NewTokenGenerator(cfg.JWTSecret, cfg.JWTExpiration)
+	userRepo := postgres.NewUserRepo(pool)
+	userSvc := service.NewUserService(userRepo, tokenGen, log)
+	userHanlder := handler.NewAuthHandler(userSvc, log)
+
+	//  Health Handler
 	healthH := handler.NewHealthHandler(pool, log)
 
 	// Chi Router
 	r := chi.NewRouter()
 	r.Get("/health", healthH.Ping())
+	r.Post("/register", userHanlder.Register())
+	r.Post("/login", userHanlder.Login())
 
 	// HTTP server with timeouts
 	srv := &http.Server{
