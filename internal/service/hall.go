@@ -26,8 +26,8 @@ type HallResponse struct {
 }
 
 var (
-	ErrorEmptyHallName = errors.New("hall is required")
-	ErrorInvalidHallID = errors.New("invalid hall id")
+	ErrInvalidHallID = errors.New("invalid hall id")
+	ErrEmptyHallName = errors.New("hall is required")
 )
 
 type HallService interface {
@@ -53,7 +53,7 @@ func (s *hallService) AddHall(ctx context.Context, req AddHallRequest) (*HallRes
 	name := strings.TrimSpace(req.Name)
 
 	if name == "" {
-		return nil, ErrorEmptyHallName
+		return nil, ErrEmptyHallName
 	}
 
 	hall := &domain.Hall{
@@ -77,7 +77,7 @@ func (s *hallService) AddHall(ctx context.Context, req AddHallRequest) (*HallRes
 
 func (s *hallService) GetHall(ctx context.Context, hallID int64) (*HallResponse, error) {
 	if hallID <= 0 {
-		return nil, ErrorInvalidHallID
+		return nil, ErrInvalidHallID
 	}
 
 	hall, err := s.repo.GetByID(ctx, hallID)
@@ -97,13 +97,13 @@ func (s *hallService) GetHall(ctx context.Context, hallID int64) (*HallResponse,
 
 func (s *hallService) UpdateHall(ctx context.Context, hallID int64, req UpdateHallRequest) (*HallResponse, error) {
 	if hallID <= 0 {
-		return nil, ErrorInvalidHallID
+		return nil, ErrInvalidHallID
 	}
 
 	name := strings.TrimSpace(req.Name)
 
 	if name == "" {
-		return nil, ErrorEmptyHallName
+		return nil, ErrEmptyHallName
 	}
 
 	hall := &domain.Hall{
@@ -128,7 +128,7 @@ func (s *hallService) UpdateHall(ctx context.Context, hallID int64, req UpdateHa
 
 func (s *hallService) RemoveHall(ctx context.Context, hallID int64) error {
 	if hallID <= 0 {
-		return ErrorInvalidHallID
+		return ErrInvalidHallID
 	}
 
 	if err := s.repo.Delete(ctx, hallID); err != nil {

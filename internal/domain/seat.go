@@ -24,7 +24,9 @@ const (
 )
 
 var (
+	ErrSeatNotFound            = errors.New("seat not found")
 	ErrDuplicateSeat           = errors.New("duplicate seat")
+	ErrDuplicateSeatNumber     = errors.New("duplicate seat number")
 	ErrSeatForeignKeyViolation = errors.New("seat foreign key violation")
 )
 

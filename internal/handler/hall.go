@@ -40,7 +40,7 @@ func (h *HallHandler) AddHall() http.HandlerFunc {
 		hallResp, err := h.hallService.AddHall(r.Context(), req)
 		if err != nil {
 			switch {
-			case errors.Is(err, service.ErrorEmptyHallName):
+			case errors.Is(err, service.ErrEmptyHallName):
 				http.Error(w, err.Error(), http.StatusBadRequest)
 			case errors.Is(err, domain.ErrDuplicateHallName):
 				http.Error(w, err.Error(), http.StatusConflict)
@@ -69,7 +69,7 @@ func (h *HallHandler) GetHall() http.HandlerFunc {
 		hallResp, err := h.hallService.GetHall(r.Context(), hallID)
 		if err != nil {
 			switch {
-			case errors.Is(err, service.ErrorInvalidHallID):
+			case errors.Is(err, service.ErrInvalidHallID):
 				http.Error(w, err.Error(), http.StatusBadRequest)
 			case errors.Is(err, domain.ErrHallNotFound):
 				http.Error(w, err.Error(), http.StatusNotFound)
@@ -110,8 +110,8 @@ func (h *HallHandler) UpdateHall() http.HandlerFunc {
 		hallResp, err := h.hallService.UpdateHall(r.Context(), hallID, req)
 		if err != nil {
 			switch {
-			case errors.Is(err, service.ErrorInvalidHallID),
-				errors.Is(err, service.ErrorEmptyHallName):
+			case errors.Is(err, service.ErrInvalidHallID),
+				errors.Is(err, service.ErrEmptyHallName):
 				http.Error(w, err.Error(), http.StatusBadRequest)
 			case errors.Is(err, domain.ErrDuplicateHallName):
 				http.Error(w, err.Error(), http.StatusConflict)
@@ -142,7 +142,7 @@ func (h *HallHandler) RemoveHall() http.HandlerFunc {
 
 		if err := h.hallService.RemoveHall(r.Context(), hallID); err != nil {
 			switch {
-			case errors.Is(err, service.ErrorInvalidHallID):
+			case errors.Is(err, service.ErrInvalidHallID):
 				http.Error(w, err.Error(), http.StatusBadRequest)
 			case errors.Is(err, domain.ErrHallNotFound):
 				http.Error(w, err.Error(), http.StatusNotFound)
