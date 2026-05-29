@@ -12,13 +12,13 @@ import (
 
 type AuthHandler struct {
 	userService service.UserService
-	log         *slog.Logger
+	logger      *slog.Logger
 }
 
-func NewAuthHandler(userService service.UserService, log *slog.Logger) *AuthHandler {
+func NewAuthHandler(userService service.UserService, logger *slog.Logger) *AuthHandler {
 	return &AuthHandler{
 		userService: userService,
-		log:         log,
+		logger:      logger,
 	}
 }
 
@@ -37,15 +37,15 @@ func (h *AuthHandler) Register() http.HandlerFunc {
 		userResp, err := h.userService.Register(r.Context(), req)
 		if err != nil {
 			switch {
-			case errors.Is(err, service.ErrorUsernameOrEmailEmpty),
-				errors.Is(err, service.ErrorPasswordEmpty),
-				errors.Is(err, service.ErrorPasswordTooLong):
+			case errors.Is(err, service.ErrUsernameOrEmailEmpty),
+				errors.Is(err, service.ErrPasswordEmpty),
+				errors.Is(err, service.ErrPasswordTooLong):
 				http.Error(w, err.Error(), http.StatusBadRequest)
-			case errors.Is(err, domain.ErrorDuplicateEmail),
-				errors.Is(err, domain.ErrorDuplicateUsername):
+			case errors.Is(err, domain.ErrDuplicateEmail),
+				errors.Is(err, domain.ErrDuplicateUsername):
 				http.Error(w, err.Error(), http.StatusConflict)
 			default:
-				h.log.Error("register user", "err", err)
+				h.logger.Error("register user", "err", err)
 				http.Error(w, "internal error", http.StatusInternalServerError)
 			}
 			return
@@ -72,12 +72,12 @@ func (h *AuthHandler) Login() http.HandlerFunc {
 		token, err := h.userService.Login(r.Context(), req)
 		if err != nil {
 			switch {
-			case errors.Is(err, service.ErrorMissingCredentials):
+			case errors.Is(err, service.ErrMissingCredentials):
 				http.Error(w, err.Error(), http.StatusBadRequest)
-			case errors.Is(err, service.ErrorInvalidCredentials):
+			case errors.Is(err, service.ErrInvalidCredentials):
 				http.Error(w, err.Error(), http.StatusUnauthorized)
 			default:
-				h.log.Error("login user", "err", err)
+				h.logger.Error("login user", "err", err)
 				http.Error(w, "internal error", http.StatusInternalServerError)
 			}
 			return

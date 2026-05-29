@@ -33,12 +33,12 @@ type UserResponse struct {
 }
 
 var (
-	ErrorUsernameOrEmailEmpty = errors.New("username or email is required")
-	ErrorPasswordEmpty        = errors.New("password is required")
-	ErrorInvalidCredentials   = errors.New("invalid credentials")
-	ErrorMissingCredentials   = errors.New("email and password are required")
-	ErrorInvalidPassword      = errors.New("invalid password")
-	ErrorPasswordTooLong      = errors.New("password too long")
+	ErrUsernameOrEmailEmpty = errors.New("username or email is required")
+	ErrPasswordEmpty        = errors.New("password is required")
+	ErrInvalidCredentials   = errors.New("invalid credentials")
+	ErrMissingCredentials   = errors.New("email and password are required")
+	ErrInvalidPassword      = errors.New("invalid password")
+	ErrPasswordTooLong      = errors.New("password too long")
 )
 
 type UserService interface {
@@ -65,17 +65,17 @@ func (s *userService) Register(ctx context.Context, req RegisterRequest) (*UserR
 	email := strings.TrimSpace(req.Email)
 
 	if username == "" || email == "" {
-		return nil, ErrorUsernameOrEmailEmpty
+		return nil, ErrUsernameOrEmailEmpty
 	}
 
 	if req.Password == "" {
-		return nil, ErrorPasswordEmpty
+		return nil, ErrPasswordEmpty
 	}
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
 		if errors.Is(err, bcrypt.ErrPasswordTooLong) {
-			return nil, ErrorPasswordTooLong
+			return nil, ErrPasswordTooLong
 		}
 
 		s.logger.Error("hashing password failed", "err", err)
@@ -110,13 +110,13 @@ func (s *userService) Login(ctx context.Context, req LoginRequest) (string, erro
 	password := strings.TrimSpace(req.Password)
 
 	if email == "" || password == "" {
-		return "", ErrorMissingCredentials
+		return "", ErrMissingCredentials
 	}
 
 	user, err := s.repo.GetByEmail(ctx, email)
 	if err != nil {
-		if errors.Is(err, domain.ErrorUserNotFound) {
-			return "", ErrorInvalidCredentials
+		if errors.Is(err, domain.ErrUserNotFound) {
+			return "", ErrInvalidCredentials
 		}
 
 		s.logger.Error("user get by email failed", "err", err)
@@ -124,7 +124,7 @@ func (s *userService) Login(ctx context.Context, req LoginRequest) (string, erro
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
-		return "", ErrorInvalidCredentials
+		return "", ErrInvalidCredentials
 	}
 
 	token, err := s.tokenGen.GenerateToken(user.ID, user.Username)

@@ -16,9 +16,9 @@ type User struct {
 }
 
 var (
-	ErrorDuplicateEmail    = errors.New("duplicate email")
-	ErrorDuplicateUsername = errors.New("duplicate username")
-	ErrorUserNotFound      = errors.New("user not found")
+	ErrDuplicateEmail    = errors.New("duplicate email")
+	ErrDuplicateUsername = errors.New("duplicate username")
+	ErrUserNotFound      = errors.New("user not found")
 )
 
 type UserRepository interface {

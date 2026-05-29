@@ -2,6 +2,7 @@ package domain
 
 import (
 	"context"
+	"errors"
 	"time"
 )
 
@@ -22,11 +23,16 @@ const (
 	SeatClassRegular SeatClass = "regular"
 )
 
+var (
+	ErrDuplicateSeat           = errors.New("duplicate seat")
+	ErrSeatForeignKeyViolation = errors.New("seat foreign key violation")
+)
+
 type SeatRepository interface {
-	Create(ctx context.Context, s *Seat) (*Seat, error)
+	Create(ctx context.Context, s *Seat) error
 	GetByID(ctx context.Context, seatID int64) (*Seat, error)
 	ListByHallID(ctx context.Context, hallID int64) ([]Seat, error)
 	ListByClass(ctx context.Context, class SeatClass) ([]Seat, error)
-	Update(ctx context.Context, s *Seat) (*Seat, error)
+	Update(ctx context.Context, s *Seat) error
 	Delete(ctx context.Context, seatID int64) error
 }

@@ -45,9 +45,9 @@ func (r *UserRepo) Create(ctx context.Context, u *domain.User) error {
 			if pgErr.Code == "23505" {
 				switch pgErr.ConstraintName {
 				case "uq_users_email":
-					return domain.ErrorDuplicateEmail
+					return domain.ErrDuplicateEmail
 				case "uq_users_username":
-					return domain.ErrorDuplicateUsername
+					return domain.ErrDuplicateUsername
 				}
 			}
 		}
@@ -72,7 +72,7 @@ func (r *UserRepo) Update(ctx context.Context, u *domain.User) error {
 	if err := row.Scan(&u.UpdatedAt); err != nil {
 		// Check for empty results first (driver-level error)
 		if errors.Is(err, pgx.ErrNoRows) {
-			return domain.ErrorUserNotFound
+			return domain.ErrUserNotFound
 		}
 
 		// Check for Postgres server-side constraint errors
@@ -81,9 +81,9 @@ func (r *UserRepo) Update(ctx context.Context, u *domain.User) error {
 			if pgErr.Code == "23505" {
 				switch pgErr.ConstraintName {
 				case "uq_users_email":
-					return domain.ErrorDuplicateEmail
+					return domain.ErrDuplicateEmail
 				case "uq_users_username":
-					return domain.ErrorDuplicateUsername
+					return domain.ErrDuplicateUsername
 				}
 			}
 		}
@@ -109,7 +109,7 @@ func (r *UserRepo) GetByEmail(ctx context.Context, email string) (*domain.User, 
 	); err != nil {
 
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, domain.ErrorUserNotFound
+			return nil, domain.ErrUserNotFound
 		}
 
 		return nil, fmt.Errorf("get user by email: %w", err)
@@ -132,7 +132,7 @@ func (r *UserRepo) GetByID(ctx context.Context, id int64) (*domain.User, error) 
 	); err != nil {
 
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, domain.ErrorUserNotFound
+			return nil, domain.ErrUserNotFound
 		}
 
 		return nil, fmt.Errorf("get user by id: %w", err)
@@ -151,7 +151,7 @@ func (r *UserRepo) Delete(ctx context.Context, id int64) error {
 		return fmt.Errorf("delete user: %w", err)
 	}
 	if commandTag.RowsAffected() == 0 {
-		return domain.ErrorUserNotFound
+		return domain.ErrUserNotFound
 	}
 	return nil
 }

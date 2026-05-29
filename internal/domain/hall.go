@@ -2,6 +2,7 @@ package domain
 
 import (
 	"context"
+	"errors"
 	"time"
 )
 
@@ -12,9 +13,15 @@ type Hall struct {
 	UpdatedAt time.Time
 }
 
+var (
+	ErrDuplicateHallName = errors.New("duplicate halls names")
+	ErrHallNotFound      = errors.New("hall not found")
+	ErrInvalidSeatData   = errors.New("invalid seat data")
+)
+
 type HallRepository interface {
-	CreateHall(ctx context.Context, h *Hall) (*Hall, error)
-	GetHallByID(ctx context.Context, hallID int64) (*Hall, error)
-	UpdateHall(ctx context.Context, h *Hall) (*Hall, error)
-	DeleteHall(ctx context.Context, hallID int64) error
+	Create(ctx context.Context, h *Hall) error
+	GetByID(ctx context.Context, hallID int64) (*Hall, error)
+	Update(ctx context.Context, h *Hall) error
+	Delete(ctx context.Context, hallID int64) error
 }
