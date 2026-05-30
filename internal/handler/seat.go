@@ -91,34 +91,6 @@ func (h *SeatHandler) GetSeatByID() http.HandlerFunc {
 	}
 }
 
-func (h *SeatHandler) ListSeatsByHallID() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		// Extracts hall ID from the URL
-		hallIDStr := chi.URLParam(r, "hallID")
-		hallID, err := strconv.ParseInt(hallIDStr, 10, 64)
-
-		if err != nil || hallID <= 0 {
-			http.Error(w, "invalid hall ID", http.StatusBadRequest)
-			return
-		}
-
-		seatList, err := h.seatService.ListSeatsByHallID(r.Context(), hallID)
-		if err != nil {
-			switch {
-			case errors.Is(err, service.ErrInvalidHallID):
-				http.Error(w, err.Error(), http.StatusBadRequest)
-			default:
-				h.logger.Error("listing seats by hall ID (handler)", "err", err)
-				http.Error(w, "internal error", http.StatusInternalServerError)
-			}
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(seatList)
-	}
-}
-
 func (h *SeatHandler) ListSeats() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var seatList []service.SeatResponse
@@ -146,6 +118,34 @@ func (h *SeatHandler) ListSeats() http.HandlerFunc {
 			}
 		}
 
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(seatList)
+	}
+}
+
+func (h *SeatHandler) ListSeatsByHallID() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Extracts hall ID from the URL
+		hallIDStr := chi.URLParam(r, "hallID")
+		hallID, err := strconv.ParseInt(hallIDStr, 10, 64)
+
+		if err != nil || hallID <= 0 {
+			http.Error(w, "invalid hall ID", http.StatusBadRequest)
+			return
+		}
+
+		seatList, err := h.seatService.ListSeatsByHallID(r.Context(), hallID)
+		if err != nil {
+			switch {
+			case errors.Is(err, service.ErrInvalidHallID):
+				http.Error(w, err.Error(), http.StatusBadRequest)
+			default:
+				h.logger.Error("listing seats by hall ID (handler)", "err", err)
+				http.Error(w, "internal error", http.StatusInternalServerError)
+			}
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(seatList)

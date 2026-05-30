@@ -35,7 +35,8 @@ var (
 type MovieService interface {
 	AddMovie(ctx context.Context, req AddMovieRequest) (*MovieResponse, error)
 	GetMovieByID(ctx context.Context, movieID int64) (*MovieResponse, error)
-	GetMovieByTitle(ctx context.Context, movieTitle string) (*MovieResponse, error)
+	ListMovieByTitle(ctx context.Context, movieTitle string) ([]MovieResponse, error)
+	ListAllMovies(ctx context.Context) ([]MovieResponse, error)
 	UpdateMovie(ctx context.Context, movieID int64, req UpdateMovieRequest) (*MovieResponse, error)
 	RemoveMovie(ctx context.Context, movieID int64) error
 }
@@ -100,26 +101,50 @@ func (s *movieService) GetMovieByID(ctx context.Context, movieID int64) (*MovieR
 	return resp, nil
 }
 
-func (s *movieService) GetMovieByTitle(ctx context.Context, movieTitle string) (*MovieResponse, error) {
+func (s *movieService) ListMovieByTitle(ctx context.Context, movieTitle string) ([]MovieResponse, error) {
 	if movieTitle == "" {
 		return nil, domain.ErrMovieTitleEmpty
 	}
 
-	movie, err := s.repo.GetByTitle(ctx, movieTitle)
+	moviesList, err := s.repo.GetByTitle(ctx, movieTitle)
+	if err != nil {
+		return nil, err
+	}
+
+	moviesListResp := make([]MovieResponse, 0, len(moviesList))
+
+	for _, movie := range moviesList {
+		moviesListResp = append(moviesListResp, MovieResponse{
+			ID:          movie.ID,
+			Title:       movie.Title,
+			Description: movie.Description,
+			CreatedAt:   movie.CreatedAt,
+			UpdatedAt:   movie.UpdatedAt,
+		})
+	}
+
+	return moviesListResp, nil
+}
+
+func (s *movieService) ListAllMovies(ctx context.Context) ([]MovieResponse, error) {
+	moviesList, err := s.repo.ListAll(ctx)
 
 	if err != nil {
 		return nil, err
 	}
 
-	resp := &MovieResponse{
-		ID:          movie.ID,
-		Title:       movie.Title,
-		Description: movie.Description,
-		CreatedAt:   movie.CreatedAt,
-		UpdatedAt:   movie.UpdatedAt,
-	}
+	moviesListResp := make([]MovieResponse, 0, len(moviesList))
 
-	return resp, nil
+	for _, movie := range moviesList {
+		moviesListResp = append(moviesListResp, MovieResponse{
+			ID:          movie.ID,
+			Title:       movie.Title,
+			Description: movie.Description,
+			CreatedAt:   movie.CreatedAt,
+			UpdatedAt:   movie.UpdatedAt,
+		})
+	}
+	return moviesListResp, nil
 }
 
 func (s *movieService) UpdateMovie(ctx context.Context, movieID int64, req UpdateMovieRequest) (*MovieResponse, error) {

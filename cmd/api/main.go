@@ -72,6 +72,11 @@ func main() {
 	seatSvc := service.NewSeatService(seatRepo, log)
 	seatHandler := handler.NewSeatHandler(seatSvc, log)
 
+	// -- Movie components --
+	movieRepo := postgres.NewMovieRepo(pool)
+	movieSvc := service.NewMovieService(movieRepo, log)
+	movieHandler := handler.NewMovieHandler(movieSvc, log)
+
 	//  Health Handler
 	healthH := handler.NewHealthHandler(pool, log)
 
@@ -90,6 +95,14 @@ func main() {
 			r.Patch("/{hallID}", hallHandler.UpdateHall())
 			r.Delete("/{hallID}", hallHandler.RemoveHall())
 			r.Get("/{hallID}/seats", seatHandler.ListSeatsByHallID())
+		})
+
+		r.Route("/movies", func(r chi.Router) {
+			r.Post("/", movieHandler.AddMovie())
+			r.Get("/{movieID}", movieHandler.GetMovieByID())
+			r.Get("/", movieHandler.ListMovies())
+			r.Patch("/{movieID}", movieHandler.UpdateMovie())
+			r.Delete("/{movieID}", movieHandler.RemoveMovie())
 		})
 
 		r.Route("/seats", func(r chi.Router) {

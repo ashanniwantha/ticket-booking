@@ -73,25 +73,57 @@ func (r *MovieRepo) GetByID(ctx context.Context, movieID int64) (*domain.Movie, 
 	return &movie, nil
 }
 
-func (r *MovieRepo) GetByTitle(ctx context.Context, movieTitle string) (*domain.Movie, error) {
-	var movie domain.Movie
-
+func (r *MovieRepo) GetByTitle(ctx context.Context, movieTitle string) ([]domain.Movie, error) {
 	query := `
 	SELECT id, title, description, created_at, updated_at
 	FROM movies
 	WHERE title=$1
 	`
-	row := r.conn(ctx).QueryRow(ctx, query, movieTitle)
+	rows, err := r.conn(ctx).Query(ctx, query, movieTitle)
+	if err != nil {
+		return nil, fmt.Errorf("querying all movies by movies title: %w", err)
+	}
+	defer rows.Close()
+	moviesList := make([]domain.Movie, 0)
 
-	if err := row.Scan(&movie.ID, &movie.Title, &movie.Description, &movie.CreatedAt, &movie.UpdatedAt); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, domain.ErrMovieNotFound
+	for rows.Next() {
+		var movie domain.Movie
+
+		if err := rows.Scan(&movie.ID, &movie.Title, &movie.Description, &movie.CreatedAt, &movie.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scanning movies list (repo): %w", err)
 		}
+		moviesList = append(moviesList, movie)
+	}
+	return moviesList, nil
+}
 
-		return nil, fmt.Errorf("getting movie by title: %w", err)
+func (r *MovieRepo) ListAll(ctx context.Context) ([]domain.Movie, error) {
+	query := `
+	SELECT id, title, description, created_at, updated_at
+	FROM movies
+	`
+	rows, err := r.conn(ctx).Query(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("listing all movies (repo): %w", err)
+	}
+	defer rows.Close()
+	moviesList := make([]domain.Movie, 0)
+
+	for rows.Next() {
+		var movie domain.Movie
+		if err := rows.Scan(
+			&movie.ID, &movie.Title, &movie.Description, &movie.CreatedAt, &movie.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scanning movies list (repo): %w", err)
+		}
+		moviesList = append(moviesList, movie)
 	}
 
-	return &movie, nil
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("scanning movies list completed with errors: %w", err)
+	}
+
+	return moviesList, nil
 }
 
 func (r *MovieRepo) Update(ctx context.Context, m *domain.Movie) error {
