@@ -2,6 +2,7 @@ package domain
 
 import (
 	"context"
+	"errors"
 	"time"
 )
 
@@ -13,9 +14,15 @@ type Movie struct {
 	UpdatedAt   time.Time
 }
 
+var (
+	ErrMovieNotFound   = errors.New("movie not found")
+	ErrMovieTitleEmpty = errors.New("movie title empty")
+)
+
 type MovieRepository interface {
-	CreateMovie(ctx context.Context, m *Movie) (*Movie, error)
-	GetMovieByID(ctx context.Context, movieID int64) (*Movie, error)
-	UpdateMovie(ctx context.Context, m *Movie) (*Movie, error)
-	DeleteMovie(ctx context.Context, movieID int64) error
+	Create(ctx context.Context, m *Movie) (*Movie, error)
+	GetByID(ctx context.Context, movieID int64) (*Movie, error)
+	GetByTitle(ctx context.Context, movieTitle string) (*Movie, error)
+	Update(ctx context.Context, m *Movie) error
+	Delete(ctx context.Context, movieID int64) error
 }
