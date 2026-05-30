@@ -16,11 +16,11 @@ type Movie struct {
 
 var (
 	ErrMovieNotFound   = errors.New("movie not found")
-	ErrMovieTitleEmpty = errors.New("movie title empty")
+	ErrMovieTitleEmpty = errors.New("movie title is required")
 )
 
 type MovieRepository interface {
-	Create(ctx context.Context, m *Movie) (*Movie, error)
+	Create(ctx context.Context, m *Movie) error
 	GetByID(ctx context.Context, movieID int64) (*Movie, error)
 	GetByTitle(ctx context.Context, movieTitle string) (*Movie, error)
 	Update(ctx context.Context, m *Movie) error
