@@ -38,6 +38,7 @@ var (
 type SeatService interface {
 	AddSeat(ctx context.Context, req AddSeatRequest) (*SeatResponse, error)
 	GetSeatByID(ctx context.Context, seatID int64) (*SeatResponse, error)
+	ListAllSeats(ctx context.Context) ([]SeatResponse, error)
 	ListSeatsByHallID(ctx context.Context, hallID int64) ([]SeatResponse, error)
 	ListSeatsByClass(ctx context.Context, class domain.SeatClass) ([]SeatResponse, error)
 	UpdateSeat(ctx context.Context, seatID int64, req UpdateSeatRequest) (*SeatResponse, error)
@@ -113,6 +114,29 @@ func (s *seatService) GetSeatByID(ctx context.Context, seatID int64) (*SeatRespo
 	}
 
 	return seatResp, nil
+}
+
+func (s *seatService) ListAllSeats(ctx context.Context) ([]SeatResponse, error) {
+	seatsList, err := s.repo.ListAll(ctx)
+
+	if err != nil {
+		return nil, err
+	}
+
+	seatListResp := make([]SeatResponse, 0, len(seatsList))
+
+	for _, seat := range seatsList {
+		seatListResp = append(seatListResp, SeatResponse{
+			ID:         seat.ID,
+			HallID:     seat.HallID,
+			SeatNumber: seat.SeatNumber,
+			Class:      seat.Class,
+			CreatedAt:  seat.CreatedAt,
+			UpdatedAt:  seat.UpdatedAt,
+		})
+	}
+
+	return seatListResp, nil
 }
 
 func (s *seatService) ListSeatsByHallID(ctx context.Context, hallID int64) ([]SeatResponse, error) {

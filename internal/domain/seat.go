@@ -33,6 +33,7 @@ var (
 type SeatRepository interface {
 	Create(ctx context.Context, s *Seat) error
 	GetByID(ctx context.Context, seatID int64) (*Seat, error)
+	ListAll(ctx context.Context) ([]Seat, error)
 	ListByHallID(ctx context.Context, hallID int64) ([]Seat, error)
 	ListByClass(ctx context.Context, class SeatClass) ([]Seat, error)
 	Update(ctx context.Context, s *Seat) error

@@ -56,11 +56,11 @@ func (r *HallRepo) Update(ctx context.Context, h *domain.Hall) error {
 	UPDATE halls
 	SET name=$2
 	WHERE id=$1
-	RETURNING id, name, created_at, updated_at
+	RETURNING id, created_at, updated_at
 	`
 	row := r.conn(ctx).QueryRow(ctx, query, h.ID, h.Name)
 
-	if err := row.Scan(&h.ID, h.Name, h.CreatedAt, h.UpdatedAt); err != nil {
+	if err := row.Scan(&h.ID, &h.CreatedAt, &h.UpdatedAt); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return domain.ErrHallNotFound
 		}
@@ -85,6 +85,7 @@ func (r *HallRepo) GetByID(ctx context.Context, hallID int64) (*domain.Hall, err
 
 	query := `
 	SELECT id, name, created_at, updated_at
+	FROM halls
 	WHERE id=$1
 	`
 	row := r.conn(ctx).QueryRow(ctx, query, hallID)

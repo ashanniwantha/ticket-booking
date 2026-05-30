@@ -89,6 +89,36 @@ func (r *SeatRepo) GetByID(ctx context.Context, seatID int64) (*domain.Seat, err
 	return &seat, nil
 }
 
+func (r *SeatRepo) ListAll(ctx context.Context) ([]domain.Seat, error) {
+	seatList := make([]domain.Seat, 0)
+
+	query := `
+		SELECT id, hall_id, seat_number, class, created_at,updated_at
+		FROM seats
+	`
+	rows, err := r.conn(ctx).Query(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("querying all seats (repository): %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var seat domain.Seat
+		if err := rows.Scan(
+			&seat.ID, &seat.HallID, &seat.SeatNumber, &seat.Class, &seat.CreatedAt, &seat.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scanning seat row: %w", err)
+		}
+		seatList = append(seatList, seat)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("scanning seats completed with errors: %w", err)
+	}
+
+	return seatList, nil
+}
+
 func (r *SeatRepo) ListByHallID(ctx context.Context, hallID int64) ([]domain.Seat, error) {
 	seatList := make([]domain.Seat, 0)
 

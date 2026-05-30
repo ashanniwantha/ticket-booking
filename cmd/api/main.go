@@ -60,16 +60,46 @@ func main() {
 	tokenGen := auth.NewTokenGenerator(cfg.JWTSecret, cfg.JWTExpiration)
 	userRepo := postgres.NewUserRepo(pool)
 	userSvc := service.NewUserService(userRepo, tokenGen, log)
-	userHanlder := handler.NewAuthHandler(userSvc, log)
+	userHandler := handler.NewAuthHandler(userSvc, log)
+
+	// -- Hall components --
+	hallRepo := postgres.NewHallRepo(pool)
+	hallSvc := service.NewHallService(hallRepo, log)
+	hallHandler := handler.NewHallHandler(hallSvc, log)
+
+	// -- Seat components --
+	seatRepo := postgres.NewSeatRepo(pool)
+	seatSvc := service.NewSeatService(seatRepo, log)
+	seatHandler := handler.NewSeatHandler(seatSvc, log)
 
 	//  Health Handler
 	healthH := handler.NewHealthHandler(pool, log)
 
 	// Chi Router
 	r := chi.NewRouter()
+
 	r.Get("/health", healthH.Ping())
-	r.Post("/register", userHanlder.Register())
-	r.Post("/login", userHanlder.Login())
+
+	r.Route("/api/v1", func(r chi.Router) {
+		r.Post("/register", userHandler.Register())
+		r.Post("/login", userHandler.Login())
+
+		r.Route("/halls", func(r chi.Router) {
+			r.Post("/", hallHandler.AddHall())
+			r.Get("/{hallID}", hallHandler.GetHall())
+			r.Patch("/{hallID}", hallHandler.UpdateHall())
+			r.Delete("/{hallID}", hallHandler.RemoveHall())
+			r.Get("/{hallID}/seats", seatHandler.ListSeatsByHallID())
+		})
+
+		r.Route("/seats", func(r chi.Router) {
+			r.Post("/", seatHandler.AddSeat())
+			r.Get("/", seatHandler.ListSeats()) // inside handler check query class
+			r.Get("/{seatID}", seatHandler.GetSeatByID())
+			r.Patch("/{seatID}", seatHandler.UpdateSeat())
+			r.Delete("/{seatID}", seatHandler.RemoveSeat())
+		})
+	})
 
 	// HTTP server with timeouts
 	srv := &http.Server{
@@ -103,5 +133,4 @@ func main() {
 	}
 
 	log.Info("server stopped")
-
 }
