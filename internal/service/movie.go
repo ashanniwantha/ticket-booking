@@ -167,6 +167,7 @@ func (s *movieService) UpdateMovie(ctx context.Context, movieID int64, req Updat
 		Title:       movie.Title,
 		Description: movie.Description,
 		CreatedAt:   movie.CreatedAt,
+		UpdatedAt:   movie.UpdatedAt,
 	}
 
 	s.logger.Info("movie updated", "title", movie.Title)
