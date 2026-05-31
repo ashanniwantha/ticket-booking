@@ -28,4 +28,9 @@ var (
 	ErrUserNotFound      = errors.New("user not found")
 	ErrDuplicateEmail    = errors.New("duplicate email")
 	ErrDuplicateUsername = errors.New("duplicate username")
+
+	// ---------- Ticket ----------
+	ErrTicketNotFound    = errors.New("ticket not found")
+	ErrSeatUnavailable   = errors.New("seat already held or booked")
+	ErrInvalidTicketData = errors.New("invalid ticket data")
 )

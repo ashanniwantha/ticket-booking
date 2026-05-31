@@ -31,6 +31,15 @@ var (
 	ErrUsernameOrEmailEmpty = errors.New("username or email is required")
 	ErrPasswordEmpty        = errors.New("password is required")
 	ErrPasswordTooLong      = errors.New("password too long")
+	ErrInvalidUserID        = errors.New("invalid user ID")
 	ErrMissingCredentials   = errors.New("email and password are required")
 	ErrInvalidCredentials   = errors.New("invalid credentials")
+)
+
+// ---------- Ticket Booking ----------
+var (
+	ErrInvalidTicketID           = errors.New("invalid ticket ID")
+	ErrTicketNotHold             = errors.New("ticket must be in 'hold' status to confirm")
+	ErrTicketAlreadyCancelled    = errors.New("ticket is already cancelled")
+	ErrSeatScreeningHallMismatch = errors.New("seat does not belong to the screening's hall")
 )

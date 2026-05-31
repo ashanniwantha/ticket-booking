@@ -25,9 +25,13 @@ const (
 
 // TicketRepository defines the contract for data access.
 type TicketRepository interface {
-	Create(ctx context.Context, t *Ticket) (*Ticket, error)
-	GettByID(ctx context.Context, id int64) (*Ticket, error)
+	Create(ctx context.Context, ticket *Ticket) error
+	GetByID(ctx context.Context, ticketID int64) (*Ticket, error)
 	ListByScreening(ctx context.Context, screeningID int64) ([]Ticket, error)
 	ListByUser(ctx context.Context, userID int64) ([]Ticket, error)
+	Update(ctx context.Context, ticket *Ticket) error
 	UpdateStatus(ctx context.Context, ticketID int64, status TicketStatus) error
+	// GetByIDForUpdate is used within a transaction to lock the row
+	GetByIDForUpdate(ctx context.Context, ticketID int64) (*Ticket, error)
+	Delete(ctx context.Context, TicketID int64) error
 }
