@@ -17,16 +17,6 @@ type HoldSeatRequest struct {
 	UserID      int64 `json:"user_id"`
 }
 
-type ConfirmHoldRequest struct {
-	TicketID int64 `json:"id"`
-	UserID   int64 `json:"user_id"`
-}
-
-type CancelTicketRequest struct {
-	TicketID int64 `json:"id"`
-	UserID   int64 `json:"user_id"`
-}
-
 type TicketResponse struct {
 	ID          int64               `json:"id"`
 	ScreeningID int64               `json:"screening_id"`
@@ -39,8 +29,8 @@ type TicketResponse struct {
 
 type BookingService interface {
 	HoldSeat(ctx context.Context, req HoldSeatRequest) (*TicketResponse, error)
-	ConfirmHold(ctx context.Context, req ConfirmHoldRequest) error
-	CancelTicket(ctx context.Context, req CancelTicketRequest) error
+	ConfirmHold(ctx context.Context, ticketID int64, userID int64) error
+	CancelTicket(ctx context.Context, ticketID int64, userID int64) error
 }
 
 type bookingService struct {
@@ -128,11 +118,11 @@ func (s *bookingService) HoldSeat(ctx context.Context, req HoldSeatRequest) (*Ti
 	return ticketResp, nil
 }
 
-func (s *bookingService) ConfirmHold(ctx context.Context, req ConfirmHoldRequest) error {
-	if req.TicketID <= 0 {
+func (s *bookingService) ConfirmHold(ctx context.Context, ticketID int64, userID int64) error {
+	if ticketID <= 0 {
 		return ErrInvalidTicketID
 	}
-	if req.UserID <= 0 {
+	if userID <= 0 {
 		return ErrInvalidUserID
 	}
 
@@ -146,7 +136,7 @@ func (s *bookingService) ConfirmHold(ctx context.Context, req ConfirmHoldRequest
 	// Embeds transaction in ctx
 	ctx = postgres.WithTx(ctx, tx)
 
-	ticket, err := s.ticketRepo.GetByIDForUpdate(ctx, req.TicketID)
+	ticket, err := s.ticketRepo.GetByIDForUpdate(ctx, ticketID)
 	if err != nil {
 		return err
 	}
@@ -155,11 +145,11 @@ func (s *bookingService) ConfirmHold(ctx context.Context, req ConfirmHoldRequest
 		return ErrTicketNotHold
 	}
 
-	if ticket.UserID != req.UserID {
+	if ticket.UserID != userID {
 		return domain.ErrTicketNotFound
 	}
 
-	if err = s.ticketRepo.UpdateStatus(ctx, req.TicketID, domain.TicketStatusBooked); err != nil {
+	if err = s.ticketRepo.UpdateStatus(ctx, ticketID, domain.TicketStatusBooked); err != nil {
 		return err
 	}
 	// Commit transaction
@@ -170,11 +160,11 @@ func (s *bookingService) ConfirmHold(ctx context.Context, req ConfirmHoldRequest
 	return nil
 }
 
-func (s *bookingService) CancelTicket(ctx context.Context, req CancelTicketRequest) error {
-	if req.TicketID <= 0 {
+func (s *bookingService) CancelTicket(ctx context.Context, ticketID int64, userID int64) error {
+	if ticketID <= 0 {
 		return ErrInvalidTicketID
 	}
-	if req.UserID <= 0 {
+	if userID <= 0 {
 		return ErrInvalidUserID
 	}
 
@@ -188,18 +178,18 @@ func (s *bookingService) CancelTicket(ctx context.Context, req CancelTicketReque
 	// Embed transaction into ctx
 	ctx = postgres.WithTx(ctx, tx)
 
-	ticket, err := s.ticketRepo.GetByIDForUpdate(ctx, req.TicketID)
+	ticket, err := s.ticketRepo.GetByIDForUpdate(ctx, ticketID)
 	if err != nil {
 		return err
 	}
 	if ticket.Status == domain.TicketStatusCancelled {
 		return ErrTicketAlreadyCancelled
 	}
-	if ticket.UserID != req.UserID {
+	if ticket.UserID != userID {
 		return domain.ErrTicketNotFound
 	}
 
-	if err := s.ticketRepo.UpdateStatus(ctx, req.TicketID, domain.TicketStatusCancelled); err != nil {
+	if err := s.ticketRepo.UpdateStatus(ctx, ticketID, domain.TicketStatusCancelled); err != nil {
 		return err
 	}
 	// Commit transaction

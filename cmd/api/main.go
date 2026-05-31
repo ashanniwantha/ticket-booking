@@ -82,6 +82,19 @@ func main() {
 	screeningSvc := service.NewScreeningService(screeningRepo, log)
 	screeningHandler := handler.NewScreeningHandler(screeningSvc, log)
 
+	// -- Ticket components --
+	ticketRepo := postgres.NewTicketRepo(pool)
+
+	// -- Booking components --
+	bookingSvc := service.NewBookingService(
+		ticketRepo,
+		screeningRepo,
+		seatRepo,
+		log,
+		pool,
+	)
+	bookingHandler := handler.NewBookingHandler(bookingSvc, log)
+
 	//  Health Handler
 	healthH := handler.NewHealthHandler(pool, log)
 
@@ -91,41 +104,53 @@ func main() {
 	r.Get("/health", healthH.Ping())
 
 	r.Route("/api/v1", func(r chi.Router) {
+		// Publlic authentication
 		r.Post("/register", userHandler.Register())
 		r.Post("/login", userHandler.Login())
 
-		r.Route("/halls", func(r chi.Router) {
-			r.Post("/", hallHandler.AddHall())
-			r.Get("/{hall_id}", hallHandler.GetHall())
-			r.Get("/{hall_id}/screenings", screeningHandler.ListScreeningsByHall())
-			r.Patch("/{hall_id}", hallHandler.UpdateHall())
-			r.Delete("/{hall_id}", hallHandler.RemoveHall())
-			r.Get("/{hall_id}/seats", seatHandler.ListSeatsByHallID())
-		})
+		// Protected admin routes (any authenticated user)
+		r.Group(func(r chi.Router) {
+			r.Use(auth.Authenticate(tokenGen))
 
-		r.Route("/movies", func(r chi.Router) {
-			r.Post("/", movieHandler.AddMovie())
-			r.Get("/{movie_id}", movieHandler.GetMovieByID())
-			r.Get("/{movie_id}/screenings", screeningHandler.ListScreeningsByMovie())
-			r.Get("/", movieHandler.ListMovies())
-			r.Patch("/{movie_id}", movieHandler.UpdateMovie())
-			r.Delete("/{movie_id}", movieHandler.RemoveMovie())
-		})
+			r.Route("/halls", func(r chi.Router) {
+				r.Post("/", hallHandler.AddHall())
+				r.Get("/{hall_id}", hallHandler.GetHall())
+				r.Get("/{hall_id}/screenings", screeningHandler.ListScreeningsByHall())
+				r.Patch("/{hall_id}", hallHandler.UpdateHall())
+				r.Delete("/{hall_id}", hallHandler.RemoveHall())
+				r.Get("/{hall_id}/seats", seatHandler.ListSeatsByHallID())
+			})
 
-		r.Route("/seats", func(r chi.Router) {
-			r.Post("/", seatHandler.AddSeat())
-			r.Get("/", seatHandler.ListSeats()) // inside handler check query class
-			r.Get("/{seat_id}", seatHandler.GetSeatByID())
-			r.Patch("/{seat_id}", seatHandler.UpdateSeat())
-			r.Delete("/{seat_id}", seatHandler.RemoveSeat())
-		})
+			r.Route("/movies", func(r chi.Router) {
+				r.Post("/", movieHandler.AddMovie())
+				r.Get("/{movie_id}", movieHandler.GetMovieByID())
+				r.Get("/{movie_id}/screenings", screeningHandler.ListScreeningsByMovie())
+				r.Get("/", movieHandler.ListMovies())
+				r.Patch("/{movie_id}", movieHandler.UpdateMovie())
+				r.Delete("/{movie_id}", movieHandler.RemoveMovie())
+			})
 
-		r.Route("/screenings", func(r chi.Router) {
-			r.Post("/", screeningHandler.AddScreening())
-			r.Get("/{screening_id}", screeningHandler.GetScreeningByID())
-			r.Get("/", screeningHandler.ListAllScreenings())
-			r.Patch("/{screening_id}", screeningHandler.UpdateScreening())
-			r.Delete("/{screening_id}", screeningHandler.RemoveScreening())
+			r.Route("/seats", func(r chi.Router) {
+				r.Post("/", seatHandler.AddSeat())
+				r.Get("/", seatHandler.ListSeats()) // inside handler check query class
+				r.Get("/{seat_id}", seatHandler.GetSeatByID())
+				r.Patch("/{seat_id}", seatHandler.UpdateSeat())
+				r.Delete("/{seat_id}", seatHandler.RemoveSeat())
+			})
+
+			r.Route("/screenings", func(r chi.Router) {
+				r.Post("/", screeningHandler.AddScreening())
+				r.Get("/{screening_id}", screeningHandler.GetScreeningByID())
+				r.Get("/", screeningHandler.ListAllScreenings())
+				r.Patch("/{screening_id}", screeningHandler.UpdateScreening())
+				r.Delete("/{screening_id}", screeningHandler.RemoveScreening())
+			})
+
+			r.Route("/bookings", func(r chi.Router) {
+				r.Post("/", bookingHandler.HoldSeat())
+				r.Patch("/{ticket_id}/confirm", bookingHandler.ConfirmHold())
+				r.Patch("/{ticket_id}/cancel", bookingHandler.CancelTicket())
+			})
 		})
 	})
 
