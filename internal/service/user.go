@@ -32,15 +32,6 @@ type UserResponse struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-var (
-	ErrUsernameOrEmailEmpty = errors.New("username or email is required")
-	ErrPasswordEmpty        = errors.New("password is required")
-	ErrInvalidCredentials   = errors.New("invalid credentials")
-	ErrMissingCredentials   = errors.New("email and password are required")
-	ErrInvalidPassword      = errors.New("invalid password")
-	ErrPasswordTooLong      = errors.New("password too long")
-)
-
 type UserService interface {
 	Register(ctx context.Context, req RegisterRequest) (*UserResponse, error)
 	Login(ctx context.Context, req LoginRequest) (string, error)

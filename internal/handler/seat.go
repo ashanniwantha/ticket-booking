@@ -65,7 +65,7 @@ func (h *SeatHandler) AddSeat() http.HandlerFunc {
 func (h *SeatHandler) GetSeatByID() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Extracts Seat ID from URL
-		seatIDStr := chi.URLParam(r, "seatID")
+		seatIDStr := chi.URLParam(r, "seat_id")
 		seatID, err := strconv.ParseInt(seatIDStr, 10, 64)
 		if err != nil || seatID <= 0 {
 			http.Error(w, "invalid seat ID", http.StatusBadRequest)
@@ -127,7 +127,7 @@ func (h *SeatHandler) ListSeats() http.HandlerFunc {
 func (h *SeatHandler) ListSeatsByHallID() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Extracts hall ID from the URL
-		hallIDStr := chi.URLParam(r, "hallID")
+		hallIDStr := chi.URLParam(r, "hall_id")
 		hallID, err := strconv.ParseInt(hallIDStr, 10, 64)
 
 		if err != nil || hallID <= 0 {
@@ -201,7 +201,7 @@ func (h *SeatHandler) UpdateSeat() http.HandlerFunc {
 func (h *SeatHandler) RemoveSeat() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Extracts seatID from the URL
-		seatIDStr := chi.URLParam(r, "seatID")
+		seatIDStr := chi.URLParam(r, "seat_id")
 		seatID, err := strconv.ParseInt(seatIDStr, 10, 64)
 
 		if err != nil || seatID <= 0 {

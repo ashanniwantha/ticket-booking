@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 	"strings"
 	"time"
@@ -27,10 +26,6 @@ type MovieResponse struct {
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }
-
-var (
-	ErrInvalidMovieID = errors.New("invalid movie id")
-)
 
 type MovieService interface {
 	AddMovie(ctx context.Context, req AddMovieRequest) (*MovieResponse, error)

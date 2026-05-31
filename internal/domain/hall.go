@@ -2,7 +2,6 @@ package domain
 
 import (
 	"context"
-	"errors"
 	"time"
 )
 
@@ -12,12 +11,6 @@ type Hall struct {
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
-
-var (
-	ErrDuplicateHallName = errors.New("duplicate halls names")
-	ErrHallNotFound      = errors.New("hall not found")
-	ErrInvalidSeatData   = errors.New("invalid seat data")
-)
 
 type HallRepository interface {
 	Create(ctx context.Context, h *Hall) error

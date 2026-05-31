@@ -2,7 +2,6 @@ package domain
 
 import (
 	"context"
-	"errors"
 	"time"
 )
 
@@ -21,13 +20,6 @@ const (
 	SeatClassVIP     SeatClass = "vip"
 	SeatClassBalcony SeatClass = "balcony"
 	SeatClassRegular SeatClass = "regular"
-)
-
-var (
-	ErrSeatNotFound            = errors.New("seat not found")
-	ErrDuplicateSeat           = errors.New("duplicate seat")
-	ErrDuplicateSeatNumber     = errors.New("duplicate seat number")
-	ErrSeatForeignKeyViolation = errors.New("seat foreign key violation")
 )
 
 type SeatRepository interface {

@@ -56,7 +56,7 @@ func (h *MovieHandler) AddMovie() http.HandlerFunc {
 
 func (h *MovieHandler) GetMovieByID() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		movieIDStr := chi.URLParam(r, "movieID")
+		movieIDStr := chi.URLParam(r, "movie_id")
 		movieID, err := strconv.ParseInt(movieIDStr, 10, 64)
 
 		if err != nil || movieID <= 0 {
@@ -114,7 +114,7 @@ func (h *MovieHandler) ListMovies() http.HandlerFunc {
 func (h *MovieHandler) UpdateMovie() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Extract Movie ID
-		movieIDStr := chi.URLParam(r, "movieID")
+		movieIDStr := chi.URLParam(r, "movie_id")
 		movieID, err := strconv.ParseInt(movieIDStr, 10, 64)
 
 		if err != nil || movieID <= 0 {
@@ -156,7 +156,7 @@ func (h *MovieHandler) UpdateMovie() http.HandlerFunc {
 func (h *MovieHandler) RemoveMovie() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Extracts movie ID
-		movieIDStr := chi.URLParam(r, "movieID")
+		movieIDStr := chi.URLParam(r, "movie_id")
 		movieID, err := strconv.ParseInt(movieIDStr, 10, 64)
 
 		if err != nil || movieID <= 0 {

@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 	"strings"
 	"time"
@@ -24,11 +23,6 @@ type HallResponse struct {
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
-
-var (
-	ErrInvalidHallID = errors.New("invalid hall id")
-	ErrEmptyHallName = errors.New("hall is required")
-)
 
 type HallService interface {
 	AddHall(ctx context.Context, req AddHallRequest) (*HallResponse, error)

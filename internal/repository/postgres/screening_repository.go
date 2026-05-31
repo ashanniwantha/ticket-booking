@@ -235,6 +235,44 @@ func (r *ScreeningRepo) ListByHall(ctx context.Context, hallID int64) ([]domain.
 	return screeningList, nil
 }
 
+func (r *ScreeningRepo) ListByMovieAndHall(ctx context.Context, movieID int64, hallID int64) ([]domain.Screening, error) {
+	screeningList := make([]domain.Screening, 0)
+
+	query := `
+	SELECT id, movie_id, hall_id, screening_period, created_at, updated_at
+	FROM screenings
+	WHERE movie_id=$1 AND hall_id=$2
+	`
+	rows, err := r.conn(ctx).Query(ctx, query, movieID, hallID)
+
+	if err != nil {
+		return nil, fmt.Errorf("querying all screenings by movie and hall (repo): %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var screening domain.Screening
+		var period pgtype.Range[time.Time]
+
+		if err := rows.Scan(
+			&screening.ID, &screening.MovieID, &screening.HallID, &period, &screening.CreatedAt, &screening.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scanning screening list (repo): %w", err)
+		}
+		//Map the range boundaries back to pure domain fields
+		screening.StartTime = period.Lower
+		screening.EndTime = period.Upper
+
+		screeningList = append(screeningList, screening)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("scanning screening list completed with errors (repo): %w", err)
+	}
+
+	return screeningList, nil
+}
+
 func (r *ScreeningRepo) Update(ctx context.Context, s *domain.Screening) error {
 	period := pgtype.Range[time.Time]{
 		Lower:     s.StartTime,

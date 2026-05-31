@@ -59,7 +59,7 @@ func (h *HallHandler) AddHall() http.HandlerFunc {
 func (h *HallHandler) GetHall() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Extracts HallID from URL
-		hallIDStr := chi.URLParam(r, "hallID")
+		hallIDStr := chi.URLParam(r, "hall_id")
 		hallID, err := strconv.ParseInt(hallIDStr, 10, 64)
 		if err != nil || hallID <= 0 {
 			http.Error(w, "invalid hall ID", http.StatusBadRequest)
@@ -89,7 +89,7 @@ func (h *HallHandler) GetHall() http.HandlerFunc {
 func (h *HallHandler) UpdateHall() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Extracts HallID from URL
-		hallIDStr := chi.URLParam(r, "hallID")
+		hallIDStr := chi.URLParam(r, "hall_id")
 		hallID, err := strconv.ParseInt(hallIDStr, 10, 64)
 		if err != nil || hallID <= 0 {
 			http.Error(w, "invalid hall ID", http.StatusBadRequest)
@@ -133,7 +133,7 @@ func (h *HallHandler) UpdateHall() http.HandlerFunc {
 func (h *HallHandler) RemoveHall() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Extracts the HallID from URL
-		hallIDStr := chi.URLParam(r, "hallID")
+		hallIDStr := chi.URLParam(r, "hall_id")
 		hallID, err := strconv.ParseInt(hallIDStr, 10, 64)
 		if err != nil || hallID <= 0 {
 			http.Error(w, "invalid hall ID", http.StatusBadRequest)

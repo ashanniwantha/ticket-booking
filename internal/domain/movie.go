@@ -2,7 +2,6 @@ package domain
 
 import (
 	"context"
-	"errors"
 	"time"
 )
 
@@ -13,11 +12,6 @@ type Movie struct {
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 }
-
-var (
-	ErrMovieNotFound   = errors.New("movie not found")
-	ErrMovieTitleEmpty = errors.New("movie title is required")
-)
 
 type MovieRepository interface {
 	Create(ctx context.Context, m *Movie) error

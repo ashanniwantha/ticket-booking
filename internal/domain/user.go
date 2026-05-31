@@ -2,7 +2,6 @@ package domain
 
 import (
 	"context"
-	"errors"
 	"time"
 )
 
@@ -14,12 +13,6 @@ type User struct {
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 }
-
-var (
-	ErrDuplicateEmail    = errors.New("duplicate email")
-	ErrDuplicateUsername = errors.New("duplicate username")
-	ErrUserNotFound      = errors.New("user not found")
-)
 
 type UserRepository interface {
 	Create(ctx context.Context, u *User) error

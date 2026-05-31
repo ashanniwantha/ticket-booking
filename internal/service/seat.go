@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 	"time"
 
@@ -28,12 +27,6 @@ type SeatResponse struct {
 	CreatedAt  time.Time        `json:"created_at"`
 	UpdatedAt  time.Time        `json:"updated_at"`
 }
-
-var (
-	ErrInvalidSeatID    = errors.New("invalid seat ID")
-	ErrEmptySeatNumber  = errors.New("seat number is required")
-	ErrInvalidSeatClass = errors.New("invalid seat class")
-)
 
 type SeatService interface {
 	AddSeat(ctx context.Context, req AddSeatRequest) (*SeatResponse, error)
