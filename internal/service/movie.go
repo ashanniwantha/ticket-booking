@@ -14,6 +14,10 @@ import (
 	"golang.org/x/sync/singleflight"
 )
 
+const (
+	movieVersionKey = "movies:version"
+)
+
 type AddMovieRequest struct {
 	Title       string `json:"title"`
 	Description string `json:"description"`
@@ -44,15 +48,16 @@ type MovieService interface {
 type movieService struct {
 	repo    domain.MovieRepository
 	cache   *redis.Client
-	sfGroup singleflight.Group
 	logger  *slog.Logger
+	sfGroup singleflight.Group
 }
 
 func NewMovieService(repo domain.MovieRepository, cache *redis.Client, logger *slog.Logger) MovieService {
 	return &movieService{
-		repo:   repo,
-		cache:  cache,
-		logger: logger,
+		repo:    repo,
+		cache:   cache,
+		logger:  logger,
+		sfGroup: singleflight.Group{},
 	}
 }
 
@@ -69,6 +74,8 @@ func (s *movieService) AddMovie(ctx context.Context, req AddMovieRequest) (*Movi
 	if err := s.repo.Create(ctx, movie); err != nil {
 		return nil, err
 	}
+	// Bumping master version
+	s.incrementCollectionVersion(ctx, movieVersionKey)
 
 	resp := &MovieResponse{
 		ID:          movie.ID,
@@ -87,21 +94,61 @@ func (s *movieService) GetMovieByID(ctx context.Context, movieID int64) (*MovieR
 		return nil, ErrInvalidMovieID
 	}
 
-	movie, err := s.repo.GetByID(ctx, movieID)
+	// 1. -- Try cache first --
+	cacheKey := fmt.Sprintf("movies:%d", movieID)
+	if cache, err := s.cache.Get(ctx, cacheKey).Bytes(); err == nil {
+		var moviesCache MovieResponse
 
+		if err := json.Unmarshal(cache, &moviesCache); err == nil {
+			return &moviesCache, nil
+		} else {
+			s.logger.Warn("failed to unmarshal cached data, falling back to db", "err", err)
+		}
+
+	} else if !errors.Is(err, redis.Nil) {
+		s.logger.Warn("redis error fetching movies by ID, falling back to db", "err", err)
+	}
+
+	// 2. -- Cache Missed: Activate Sigleflight to prevent Thundering Herd --
+	val, err, shared := s.sfGroup.Do(cacheKey, func() (interface{}, error) {
+
+		// Detach cancellation from leader's context but enforces a timeout
+		dbCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+		defer cancel()
+
+		// This block executes exactly ONCE for concurrent requests
+		movie, err := s.repo.GetByID(dbCtx, movieID)
+		if err != nil {
+			return nil, err
+		}
+
+		movieResp := MovieResponse{
+			ID:          movie.ID,
+			Title:       movie.Title,
+			Description: movie.Description,
+			CreatedAt:   movie.CreatedAt,
+			UpdatedAt:   movie.UpdatedAt,
+		}
+
+		// 3. -- Update Cache Asynchronously (Fire-and-Forget) --
+		go s.writeToCacheBackground(cacheKey, movieResp, 5*time.Minute)
+
+		return movieResp, nil
+	})
+
+	// 5. -- Handle SingleFlight processign results --
 	if err != nil {
 		return nil, err
 	}
 
-	resp := &MovieResponse{
-		ID:          movie.ID,
-		Title:       movie.Title,
-		Description: movie.Description,
-		CreatedAt:   movie.CreatedAt,
-		UpdatedAt:   movie.UpdatedAt,
+	movie, ok := val.(MovieResponse)
+	if !ok {
+		return nil, fmt.Errorf("unexpected data type from Singleflight group")
 	}
-
-	return resp, nil
+	if shared {
+		s.logger.Info("Concurrency suppressed via Singleflight", "key", cacheKey)
+	}
+	return &movie, nil
 }
 
 func (s *movieService) ListMovieByTitle(ctx context.Context, movieTitle string) ([]MovieResponse, error) {
@@ -130,22 +177,33 @@ func (s *movieService) ListMovieByTitle(ctx context.Context, movieTitle string) 
 }
 
 func (s *movieService) ListAllMovies(ctx context.Context) ([]MovieResponse, error) {
-	const cacheKey = "movies:all"
+	// 1. -- Fetch master collection versions (Defaults to 0 if not exists)
+	version, err := s.cache.Get(ctx, movieVersionKey).Int64()
+	if err != nil {
+		if !errors.Is(err, redis.Nil) {
+			s.logger.Warn("failed fetching movie cache collection version, falling back to 0", "err", err)
+		}
+		version = 0
+	}
 
-	// 1. -- Try Cache First --
+	// 2. -- Generate a version-scoped cache key which natively scales --
+	cacheKey := fmt.Sprintf("movies:v%d:all", version)
+
+	// 3. -- Try Cache First --
 	if cache, err := s.cache.Get(ctx, cacheKey).Bytes(); err == nil {
 		var cachedMovies []MovieResponse
-		if err := json.Unmarshal(cache, &cachedMovies); err != nil {
-			s.logger.Warn("failed to unmarshal cached data, falling back to db", "err", err)
-		} else {
+		if err := json.Unmarshal(cache, &cachedMovies); err == nil {
 			return cachedMovies, nil
+		} else {
+			s.logger.Warn("failed to unmarshal cached data, falling back to db", "err", err)
 		}
+
 	} else if !errors.Is(err, redis.Nil) {
 		s.logger.Warn("redis error fetching all movies, falling back to db", "err", err)
 	}
 
-	// 2. -- Cache Miss: Activate Singleflight to prevent Thundering Herd --
-	val, err, _ := s.sfGroup.Do(cacheKey, func() (interface{}, error) {
+	// 4. -- Cache Miss: Activate Singleflight to prevent Thundering Herd --
+	val, err, shared := s.sfGroup.Do(cacheKey, func() (interface{}, error) {
 
 		// Detach cancellation from leader's context but enforce a safety timeout
 		dbCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
@@ -168,7 +226,7 @@ func (s *movieService) ListAllMovies(ctx context.Context) ([]MovieResponse, erro
 			})
 		}
 
-		// 3. -- Cache Penetration Protection: Dynamic TTL --
+		// 5. -- Cache Penetration Protection: Dynamic TTL --
 		var ttl time.Duration
 		if len(moviesListResp) == 0 {
 			ttl = 1 * time.Minute
@@ -177,30 +235,19 @@ func (s *movieService) ListAllMovies(ctx context.Context) ([]MovieResponse, erro
 			ttl = 5 * time.Minute
 		}
 
-		// 4. -- Update Cache Asynchronously (Fire-and-Forget) --
-		go func(dataToCache []MovieResponse, cacheTTL time.Duration) {
-			bgCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
-
-			data, err := json.Marshal(dataToCache)
-			if err != nil {
-				s.logger.Warn("failed to marshal movies for caching", "err", err)
-				return
-			}
-
-			if err := s.cache.Set(bgCtx, cacheKey, data, cacheTTL); err != nil {
-				s.logger.Warn("failed to cache movies in background", "err", err)
-			}
-		}(moviesListResp, ttl)
+		// 6. -- Update Cache Asynchronously (Fire-and-Forget) --
+		go s.writeToCacheBackground(cacheKey, moviesListResp, ttl)
 
 		return moviesListResp, nil
 	})
 
-	// 5. -- Handle Singleflight Processing Results --
+	// 7. -- Handle Singleflight Processing Results --
 	if err != nil {
 		return nil, err
 	}
-
+	if shared {
+		s.logger.Info("concurrency suppressed via Singleflight", "key", cacheKey)
+	}
 	movies, ok := val.([]MovieResponse)
 	if !ok {
 		return nil, fmt.Errorf("unexpected data type from singleflight group")
@@ -224,6 +271,13 @@ func (s *movieService) UpdateMovie(ctx context.Context, movieID int64, req Updat
 		return nil, err
 	}
 
+	// Evict specific resource pointer synchronously
+	specificMovieKey := fmt.Sprintf("movies:%d", movie.ID)
+	s.evictCache(ctx, specificMovieKey)
+
+	// Increment collection state synchronously before returning status code
+	s.incrementCollectionVersion(ctx, movieVersionKey)
+
 	resp := &MovieResponse{
 		ID:          movie.ID,
 		Title:       movie.Title,
@@ -232,7 +286,7 @@ func (s *movieService) UpdateMovie(ctx context.Context, movieID int64, req Updat
 		UpdatedAt:   movie.UpdatedAt,
 	}
 
-	s.logger.Info("movie updated", "title", movie.Title)
+	s.logger.Info("movie updated successfully", "title", movie.Title)
 	return resp, nil
 }
 
@@ -245,6 +299,51 @@ func (s *movieService) RemoveMovie(ctx context.Context, movieID int64) error {
 		return err
 	}
 
-	s.logger.Info("movie deleted", "movied_id", movieID)
+	// Evict specific resource pointer synchronously
+	specificMovieKey := fmt.Sprintf("movies:%d", movieID)
+	s.evictCache(ctx, specificMovieKey)
+	// Increment collection state synchronously
+	s.incrementCollectionVersion(ctx, movieVersionKey)
+
+	s.logger.Info("movie deleted", "movie_id", movieID)
 	return nil
+}
+
+// Helper method for movie service to write cache
+func (s *movieService) writeToCacheBackground(cacheKey string, data any, ttl time.Duration) {
+	bgCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	bytes, err := json.Marshal(data)
+	if err != nil {
+		s.logger.Warn("failed to marshall cache movie data", "err", err, "key", cacheKey)
+		return
+	}
+	if err := s.cache.Set(bgCtx, cacheKey, bytes, ttl).Err(); err != nil {
+		s.logger.Warn("failed to cache data to redis in the background", "err", err, "key", cacheKey)
+	}
+}
+
+// Helper method for movie service to remove stale cache synchronously
+func (s *movieService) evictCache(ctx context.Context, cacheKeys ...string) {
+	bgCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
+
+	if err := s.cache.Del(bgCtx, cacheKeys...).Err(); err != nil {
+		s.logger.Warn("failed to evict stale cache from redis", "err", err, "keys", cacheKeys)
+	}
+}
+
+// Help method for incrementing the master collection cache version
+func (s *movieService) incrementCollectionVersion(ctx context.Context, collectionKey string) {
+	bgCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 3*time.Second)
+	defer cancel()
+
+	// INCR created key with value 1 if doesn't exists, or incrment by 1 natively
+	if err := s.cache.Incr(bgCtx, collectionKey).Err(); err != nil {
+		s.logger.Warn("failed to increment collection version pointer",
+			"err", err,
+			"collection", collectionKey,
+		)
+	}
 }
