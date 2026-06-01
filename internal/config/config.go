@@ -31,9 +31,11 @@ type Config struct {
 	DBPingTimeout       time.Duration
 
 	//Redis
-	RedisHost     string
-	RedisPort     int
-	RedisPassword string
+	RedisHost        string
+	RedisPort        int
+	RedisPassword    string
+	RedisDB          int
+	RedisPingTimeout time.Duration
 
 	// Security
 	JWTSecret     string
@@ -63,13 +65,15 @@ func LoadConfig() (*Config, error) {
 		DBMaxConnLifetime:   getEnvAsDuration("DB_MAX_CONN_LIFETIME", 30*time.Minute),
 		DBMaxConnIdleTime:   getEnvAsDuration("DB_MAX_CONN_IDLE_TIME", 5*time.Minute),
 		DBHealthCheckPeriod: getEnvAsDuration("DB_HEALTH_CHECK_PERIOD", 1*time.Minute),
-		DBConnectTimeout:    getEnvAsDuration("DB_CONNECT_TIMEOUT", 5*time.Second),
+		DBConnectTimeout:    getEnvAsDuration("DB_CONNECT_TIMEOUT", 3*time.Second),
 		DBPingTimeout:       getEnvAsDuration("DB_PING_TIMEOUT", 3*time.Second),
 
 		// Redis
-		RedisHost:     getEnv("REDIS_HOST", "localhost"),
-		RedisPort:     getEnvAsInt("REDIS_PORT", 6379),
-		RedisPassword: os.Getenv("REDIS_PASSWORD"),
+		RedisHost:        getEnv("REDIS_HOST", "localhost"),
+		RedisPort:        getEnvAsInt("REDIS_PORT", 6379),
+		RedisPassword:    os.Getenv("REDIS_PASSWORD"),
+		RedisDB:          getEnvAsInt("REDIS_DB", 0),
+		RedisPingTimeout: getEnvAsDuration("REDIS_PING_TIMEOUT", 3*time.Second),
 
 		// Security
 		JWTSecret:     os.Getenv("JWT_SECRET"),

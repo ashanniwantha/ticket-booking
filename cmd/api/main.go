@@ -14,6 +14,7 @@ import (
 	"github.com/ashanniwantha/ticket-booking/internal/database"
 	"github.com/ashanniwantha/ticket-booking/internal/handler"
 	"github.com/ashanniwantha/ticket-booking/internal/logger"
+	"github.com/ashanniwantha/ticket-booking/internal/redis"
 	"github.com/ashanniwantha/ticket-booking/internal/repository/postgres"
 	"github.com/ashanniwantha/ticket-booking/internal/service"
 	"github.com/go-chi/chi/v5"
@@ -49,12 +50,30 @@ func main() {
 
 	pool, err := database.NewPool(context.Background(), dbCfg)
 	if err != nil {
-		log.Error("failed initialize database", "err", err)
+		log.Error("failed to initialize database", "err", err)
 		os.Exit(1)
 	}
 	defer pool.Close()
 
 	log.Info("Database connected", "mode", cfg.AppEnv)
+
+	redisCfg := redis.RedisConfig{
+		RedisHost:     cfg.RedisHost,
+		RedisPort:     cfg.RedisPort,
+		RedisPassword: cfg.RedisPassword,
+		DB:            cfg.RedisDB,
+		PingTimeout:   cfg.RedisPingTimeout,
+	}
+
+	rdb, err := redis.NewClient(context.Background(), redisCfg)
+	if err != nil {
+		log.Error("failed to initialize redi", "err", err)
+		os.Exit(1)
+	}
+	defer rdb.Close()
+
+	//Initialize the shared BaseHandler foundation once at the top
+	baseHandler := handler.NewBaseHandler(log)
 
 	// --- User components ---
 	tokenGen := auth.NewTokenGenerator(cfg.JWTSecret, cfg.JWTExpiration)
@@ -74,8 +93,8 @@ func main() {
 
 	// -- Movie components --
 	movieRepo := postgres.NewMovieRepo(pool)
-	movieSvc := service.NewMovieService(movieRepo, log)
-	movieHandler := handler.NewMovieHandler(movieSvc, log)
+	movieSvc := service.NewMovieService(movieRepo, rdb, log)
+	movieHandler := handler.NewMovieHandler(baseHandler, movieSvc)
 
 	// -- Screening components --
 	screeningRepo := postgres.NewScreeningRepo(pool)

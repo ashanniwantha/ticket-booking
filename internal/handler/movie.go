@@ -1,38 +1,29 @@
 package handler
 
 import (
-	"encoding/json"
 	"errors"
-	"log/slog"
 	"net/http"
-	"strconv"
 
 	"github.com/ashanniwantha/ticket-booking/internal/domain"
 	"github.com/ashanniwantha/ticket-booking/internal/service"
-	"github.com/go-chi/chi/v5"
 )
 
 type MovieHandler struct {
+	*BaseHandler // Promotes all base utilities directly to h
 	movieService service.MovieService
-	logger       *slog.Logger
 }
 
-func NewMovieHandler(movieService service.MovieService, logger *slog.Logger) *MovieHandler {
+func NewMovieHandler(base *BaseHandler, movieService service.MovieService) *MovieHandler {
 	return &MovieHandler{
+		BaseHandler:  base,
 		movieService: movieService,
-		logger:       logger,
 	}
 }
 
 func (h *MovieHandler) AddMovie() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
-		dec := json.NewDecoder(r.Body)
-		dec.DisallowUnknownFields()
-
 		var req service.AddMovieRequest
-		if err := dec.Decode(&req); err != nil {
-			http.Error(w, "invalid request body", http.StatusBadRequest)
+		if !h.DecodeJSON(w, r, &req) {
 			return
 		}
 
@@ -40,27 +31,23 @@ func (h *MovieHandler) AddMovie() http.HandlerFunc {
 		if err != nil {
 			switch {
 			case errors.Is(err, domain.ErrMovieTitleEmpty):
-				http.Error(w, err.Error(), http.StatusBadRequest)
+				h.RespondError(w, http.StatusBadRequest, err.Error())
 			default:
-				h.logger.Error("adding movie (handler)", "err", err)
-				http.Error(w, "internal error", http.StatusInternalServerError)
+				h.logger.Error("adding movie failed (handler)", "err", err)
+				h.RespondError(w, http.StatusInternalServerError, "internal error")
 			}
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(movie)
+		h.Respond(w, http.StatusCreated, movie)
 	}
 }
 
 func (h *MovieHandler) GetMovieByID() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		movieIDStr := chi.URLParam(r, "movie_id")
-		movieID, err := strconv.ParseInt(movieIDStr, 10, 64)
-
-		if err != nil || movieID <= 0 {
-			http.Error(w, "invalid movie ID", http.StatusBadRequest)
+		movieID, err := h.ParseIDParam(r, "movie_id")
+		if err != nil {
+			h.RespondError(w, http.StatusBadRequest, "invalid movie ID")
 			return
 		}
 
@@ -68,17 +55,14 @@ func (h *MovieHandler) GetMovieByID() http.HandlerFunc {
 		if err != nil {
 			switch {
 			case errors.Is(err, domain.ErrMovieNotFound):
-				http.Error(w, err.Error(), http.StatusNotFound)
+				h.RespondError(w, http.StatusNotFound, err.Error())
 			default:
-				h.logger.Error("getting movie by id (handler)", "err", err)
-				http.Error(w, "internal error", http.StatusInternalServerError)
+				h.logger.Error("getting movie by id failed (handler)", "err", err, "movie_id", movieID)
+				h.RespondError(w, http.StatusInternalServerError, "internal error")
 			}
 			return
 		}
-
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(movie)
+		h.Respond(w, http.StatusOK, movie)
 	}
 }
 
@@ -91,45 +75,31 @@ func (h *MovieHandler) ListMovies() http.HandlerFunc {
 
 		if title != "" {
 			moviesList, err = h.movieService.ListMovieByTitle(r.Context(), title)
-			h.logger.Info("listing movies by title (handler)")
+			h.logger.Info("listing movies by title (handler)", "title", title)
 		} else {
 			moviesList, err = h.movieService.ListAllMovies(r.Context())
 			h.logger.Info("listing all movies (handler)")
 		}
 
 		if err != nil {
-			h.logger.Error("getting all movies (handler)", "err", err)
-			http.Error(w, "internal error", http.StatusInternalServerError)
-
+			h.logger.Error("failed to fetch movies list (handler)", "err", err, "filtered_by_title", title != "")
+			h.RespondError(w, http.StatusInternalServerError, "internal error")
 			return
 		}
-
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(moviesList)
-
+		h.Respond(w, http.StatusOK, moviesList)
 	}
 }
 
 func (h *MovieHandler) UpdateMovie() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Extract Movie ID
-		movieIDStr := chi.URLParam(r, "movie_id")
-		movieID, err := strconv.ParseInt(movieIDStr, 10, 64)
-
-		if err != nil || movieID <= 0 {
-			http.Error(w, "invalid movie ID", http.StatusBadRequest)
+		movieID, err := h.ParseIDParam(r, "movie_id")
+		if err != nil {
+			h.RespondError(w, http.StatusBadRequest, "invalid movie ID")
 			return
 		}
 
-		// Decode and limit the incoming request body
-		r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
-		dec := json.NewDecoder(r.Body)
-		dec.DisallowUnknownFields()
-
 		var req service.UpdateMovieRequest
-		if err := dec.Decode(&req); err != nil {
-			http.Error(w, "invalid request body", http.StatusBadRequest)
+		if !h.DecodeJSON(w, r, &req) {
 			return
 		}
 
@@ -137,44 +107,37 @@ func (h *MovieHandler) UpdateMovie() http.HandlerFunc {
 		if err != nil {
 			switch {
 			case errors.Is(err, domain.ErrMovieNotFound):
-				http.Error(w, err.Error(), http.StatusNotFound)
+				h.RespondError(w, http.StatusNotFound, err.Error())
 			case errors.Is(err, domain.ErrMovieTitleEmpty):
-				http.Error(w, err.Error(), http.StatusBadRequest)
+				h.RespondError(w, http.StatusBadRequest, err.Error())
 			default:
-				h.logger.Error("updating movie (handler)", "err", err)
-				http.Error(w, "internal error", http.StatusInternalServerError)
+				h.logger.Error("updating movie failed (handler)", "err", err, "movie_id", movieID)
+				h.RespondError(w, http.StatusInternalServerError, "internal error")
 			}
 			return
 		}
-
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(movie)
+		h.Respond(w, http.StatusOK, movie)
 	}
 }
 
 func (h *MovieHandler) RemoveMovie() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Extracts movie ID
-		movieIDStr := chi.URLParam(r, "movie_id")
-		movieID, err := strconv.ParseInt(movieIDStr, 10, 64)
-
-		if err != nil || movieID <= 0 {
-			http.Error(w, "invalid movie ID", http.StatusBadRequest)
+		movieID, err := h.ParseIDParam(r, "movie_id")
+		if err != nil {
+			h.RespondError(w, http.StatusBadRequest, "invalid movie ID")
 			return
 		}
 
 		if err := h.movieService.RemoveMovie(r.Context(), movieID); err != nil {
 			switch {
 			case errors.Is(err, domain.ErrMovieNotFound):
-				http.Error(w, err.Error(), http.StatusNotFound)
+				h.RespondError(w, http.StatusNotFound, err.Error())
 			default:
-				h.logger.Error("removing movie", "err", err)
-				http.Error(w, "internal error", http.StatusInternalServerError)
+				h.logger.Error("removing movie failed (handler)", "err", err, "movie_id", movieID)
+				h.RespondError(w, http.StatusInternalServerError, "internal error")
 			}
 			return
 		}
-
 		w.WriteHeader(http.StatusNoContent)
 	}
 }
