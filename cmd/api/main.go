@@ -88,7 +88,7 @@ func main() {
 
 	// -- Seat components --
 	seatRepo := postgres.NewSeatRepo(pool)
-	seatSvc := service.NewSeatService(seatRepo, log)
+	seatSvc := service.NewSeatService(seatRepo, rdb, log)
 	seatHandler := handler.NewSeatHandler(seatSvc, log)
 
 	// -- Movie components --

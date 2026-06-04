@@ -206,8 +206,8 @@ func (s *hallService) ListAllHalls(ctx context.Context) ([]HallResponse, error) 
 			})
 		}
 
-		var ttl time.Duration
 		// Cache penetration protection: Dynamic TTL --
+		var ttl time.Duration
 		if len(hallListResp) == 0 {
 			ttl = 1 * time.Minute
 		} else {
