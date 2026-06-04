@@ -119,6 +119,12 @@ func (s *movieService) GetMovieByID(ctx context.Context, movieID int64) (*MovieR
 		// This block executes exactly ONCE for concurrent requests
 		movie, err := s.repo.GetByID(dbCtx, movieID)
 		if err != nil {
+
+			if errors.Is(err, domain.ErrMovieNotFound) {
+				s.logger.Info("movie not found in db, caching negative hit to prevent penetrations", "id", movieID)
+				go s.writeToCacheBackground(ctx, cacheKey, MovieResponse{}, 1*time.Minute)
+			}
+
 			return nil, err
 		}
 
@@ -131,7 +137,7 @@ func (s *movieService) GetMovieByID(ctx context.Context, movieID int64) (*MovieR
 		}
 
 		// 3. -- Update Cache Asynchronously (Fire-and-Forget) --
-		go s.writeToCacheBackground(cacheKey, movieResp, 5*time.Minute)
+		go s.writeToCacheBackground(ctx, cacheKey, movieResp, 5*time.Second)
 
 		return movieResp, nil
 	})
@@ -236,7 +242,7 @@ func (s *movieService) ListAllMovies(ctx context.Context) ([]MovieResponse, erro
 		}
 
 		// 6. -- Update Cache Asynchronously (Fire-and-Forget) --
-		go s.writeToCacheBackground(cacheKey, moviesListResp, ttl)
+		go s.writeToCacheBackground(ctx, cacheKey, moviesListResp, ttl)
 
 		return moviesListResp, nil
 	})
@@ -298,10 +304,10 @@ func (s *movieService) RemoveMovie(ctx context.Context, movieID int64) error {
 	if err := s.repo.Delete(ctx, movieID); err != nil {
 		return err
 	}
-
 	// Evict specific resource pointer synchronously
 	specificMovieKey := fmt.Sprintf("movies:%d", movieID)
 	s.evictCache(ctx, specificMovieKey)
+
 	// Increment collection state synchronously
 	s.incrementCollectionVersion(ctx, movieVersionKey)
 
@@ -310,8 +316,8 @@ func (s *movieService) RemoveMovie(ctx context.Context, movieID int64) error {
 }
 
 // Helper method for movie service to write cache
-func (s *movieService) writeToCacheBackground(cacheKey string, data any, ttl time.Duration) {
-	bgCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+func (s *movieService) writeToCacheBackground(ctx context.Context, cacheKey string, data any, ttl time.Duration) {
+	bgCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 	defer cancel()
 
 	bytes, err := json.Marshal(data)
@@ -339,7 +345,7 @@ func (s *movieService) incrementCollectionVersion(ctx context.Context, collectio
 	bgCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 3*time.Second)
 	defer cancel()
 
-	// INCR created key with value 1 if doesn't exists, or incrment by 1 natively
+	// Increments created key with value 1 if doesn't exists, or incrment by 1 natively
 	if err := s.cache.Incr(bgCtx, collectionKey).Err(); err != nil {
 		s.logger.Warn("failed to increment collection version pointer",
 			"err", err,

@@ -67,7 +67,7 @@ func main() {
 
 	rdb, err := redis.NewClient(context.Background(), redisCfg)
 	if err != nil {
-		log.Error("failed to initialize redi", "err", err)
+		log.Error("failed to initialize redis", "err", err)
 		os.Exit(1)
 	}
 	defer rdb.Close()
@@ -83,7 +83,7 @@ func main() {
 
 	// -- Hall components --
 	hallRepo := postgres.NewHallRepo(pool)
-	hallSvc := service.NewHallService(hallRepo, log)
+	hallSvc := service.NewHallService(hallRepo, rdb, log)
 	hallHandler := handler.NewHallHandler(hallSvc, log)
 
 	// -- Seat components --
@@ -133,6 +133,7 @@ func main() {
 
 			r.Route("/halls", func(r chi.Router) {
 				r.Post("/", hallHandler.AddHall())
+				r.Get("/", hallHandler.ListAll())
 				r.Get("/{hall_id}", hallHandler.GetHall())
 				r.Get("/{hall_id}/screenings", screeningHandler.ListScreeningsByHall())
 				r.Patch("/{hall_id}", hallHandler.UpdateHall())

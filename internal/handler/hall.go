@@ -66,7 +66,7 @@ func (h *HallHandler) GetHall() http.HandlerFunc {
 			return
 		}
 
-		hallResp, err := h.hallService.GetHall(r.Context(), hallID)
+		hallResp, err := h.hallService.GetHallByID(r.Context(), hallID)
 		if err != nil {
 			switch {
 			case errors.Is(err, service.ErrInvalidHallID):
@@ -83,6 +83,22 @@ func (h *HallHandler) GetHall() http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(hallResp)
+	}
+}
+
+func (h *HallHandler) ListAll() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		hallList, err := h.hallService.ListAllHalls(r.Context())
+		if err != nil {
+			h.logger.Error("list all halls (handler)", "err", err)
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(hallList)
 	}
 }
 

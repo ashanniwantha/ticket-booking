@@ -51,6 +51,55 @@ func (r *HallRepo) Create(ctx context.Context, h *domain.Hall) error {
 	return nil
 }
 
+func (r *HallRepo) GetByID(ctx context.Context, hallID int64) (*domain.Hall, error) {
+	var hall domain.Hall
+
+	query := `
+	SELECT id, name, created_at, updated_at
+	FROM halls
+	WHERE id=$1
+	`
+	row := r.conn(ctx).QueryRow(ctx, query, hallID)
+
+	if err := row.Scan(&hall.ID, &hall.Name, &hall.CreatedAt, &hall.UpdatedAt); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, domain.ErrHallNotFound
+		}
+
+		return nil, fmt.Errorf("get hall by id: %w", err)
+	}
+
+	return &hall, nil
+}
+
+func (r *HallRepo) ListAll(ctx context.Context) ([]domain.Hall, error) {
+	query := `
+		SELECT id, name, created_at, updated_at
+		FROM halls
+	`
+	rows, err := r.conn(ctx).Query(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("Listing all halls (repo): %w", err)
+	}
+	defer rows.Close()
+
+	hallList := make([]domain.Hall, 0)
+	for rows.Next() {
+		var hall domain.Hall
+
+		if err := rows.Scan(&hall.ID, &hall.Name, &hall.CreatedAt, &hall.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scanning hall list (repo): %w", err)
+		}
+		hallList = append(hallList, hall)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("scanning halls list completed with error: %w", err)
+	}
+
+	return hallList, nil
+}
+
 func (r *HallRepo) Update(ctx context.Context, h *domain.Hall) error {
 	query := `
 	UPDATE halls
@@ -78,27 +127,6 @@ func (r *HallRepo) Update(ctx context.Context, h *domain.Hall) error {
 		return fmt.Errorf("updating hall: %w", err)
 	}
 	return nil
-}
-
-func (r *HallRepo) GetByID(ctx context.Context, hallID int64) (*domain.Hall, error) {
-	var hall domain.Hall
-
-	query := `
-	SELECT id, name, created_at, updated_at
-	FROM halls
-	WHERE id=$1
-	`
-	row := r.conn(ctx).QueryRow(ctx, query, hallID)
-
-	if err := row.Scan(&hall.ID, &hall.Name, &hall.CreatedAt, &hall.UpdatedAt); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, domain.ErrHallNotFound
-		}
-
-		return nil, fmt.Errorf("get hall by id: %w", err)
-	}
-
-	return &hall, nil
 }
 
 func (r *HallRepo) Delete(ctx context.Context, halldID int64) error {

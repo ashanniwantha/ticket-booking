@@ -3,6 +3,7 @@ package handler
 import (
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/ashanniwantha/ticket-booking/internal/domain"
 	"github.com/ashanniwantha/ticket-booking/internal/service"
@@ -46,7 +47,7 @@ func (h *MovieHandler) AddMovie() http.HandlerFunc {
 func (h *MovieHandler) GetMovieByID() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		movieID, err := h.ParseIDParam(r, "movie_id")
-		if err != nil {
+		if err != nil || movieID <= 0 {
 			h.RespondError(w, http.StatusBadRequest, "invalid movie ID")
 			return
 		}
@@ -71,7 +72,7 @@ func (h *MovieHandler) ListMovies() http.HandlerFunc {
 		var moviesList []service.MovieResponse
 		var err error
 
-		title := r.URL.Query().Get("title")
+		title := strings.TrimSpace(r.URL.Query().Get("title"))
 
 		if title != "" {
 			moviesList, err = h.movieService.ListMovieByTitle(r.Context(), title)
@@ -93,7 +94,7 @@ func (h *MovieHandler) ListMovies() http.HandlerFunc {
 func (h *MovieHandler) UpdateMovie() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		movieID, err := h.ParseIDParam(r, "movie_id")
-		if err != nil {
+		if err != nil || movieID <= 0 {
 			h.RespondError(w, http.StatusBadRequest, "invalid movie ID")
 			return
 		}
@@ -123,7 +124,7 @@ func (h *MovieHandler) UpdateMovie() http.HandlerFunc {
 func (h *MovieHandler) RemoveMovie() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		movieID, err := h.ParseIDParam(r, "movie_id")
-		if err != nil {
+		if err != nil || movieID <= 0 {
 			h.RespondError(w, http.StatusBadRequest, "invalid movie ID")
 			return
 		}
