@@ -1,10 +1,14 @@
 # Stage 1: Build
-FROM golang:1.23-alpine AS builder
+FROM golang:1.26-alpine AS builder
 
 WORKDIR /app
 
 # Copy only dependency files first (better layer caching)
 COPY go.mod go.sum ./
+
+# Try falling back to direct download if the proxy resets the connection
+ENV GOPROXY=https://proxy.golang.org,direct
+
 RUN go mod download
 
 # Copy the rest of the source
@@ -22,7 +26,7 @@ RUN apk --no-cache add ca-certificates
 WORKDIR /app
 
 # Copy the binary and migrations from the builder
-COPY --from=builder /api .
+COPY --from=builder /api /app/api
 COPY migrations/ ./migrations/
 
 # Expose the application port (8080 by default)

@@ -1,0 +1,76 @@
+name: CI
+
+on:
+    push:
+        branches: [main]
+    pull_request:
+        branches: [main]
+
+env:
+    REGISTRY: ghcr.io
+    IMAGE_NAME:  ${{ github.repository }}
+
+jobs:
+    test:
+        runs-on: ubuntu-latest
+
+        services:
+            postgres:
+                image: postgres:18-alpine
+                env:
+                    POSTGRES_USER: testuser
+                    POSTGRES_PASSWORD: testpass
+                    POSTGRES_DB: ticketbook_test
+                ports:
+                    - 5432:5432
+                options: >-
+                    --health-cmd "pg_isready -U testuser -d ticketbook_test"
+                    --health-interval 5s
+                    --health-timeout 5s
+                    --health-retries 5
+                
+            redis:
+                image: redis:7-alpine
+                ports:
+                    - 6379:6379
+                options: >-
+                    --health-cmd "redis-cli ping"
+                    --health-interval 5s
+                    --health-timeout 5s
+                    --health-retries 5
+            
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Set up Go
+              uses: actions/setup-go@v5
+              with:
+                go-version: '1.26'
+                cache: true # automatically cache Go mod downloads
+
+            # Caching the migrate binary to speed up the build
+            - name: Cache Migrate Tool
+              id: cache-migrate
+              uses: actions/cache@v4
+              with:
+                path: ~/go/bin/migrate
+                key: ${{ runner.os }}-migrate-v4
+            
+            - name: Install migrate tool
+              if: steps.cache-migrate.outputs.cache-hit != 'true'
+              run: |
+                go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+            
+            - name: Run migrations
+              run: |
+                ~/go/bin/migrate -path "${{ github.workspace }}/migrations" -database "postgres://testuser:testpass@localhost:5432/ticketbook_test?sslmode=disable" up
+            
+            - name: Run integration test
+              env:
+                TEST_DB_HOST: localhost
+                TEST_DB_PORT: 5432
+                TEST_REDIS_HOST: localhost
+                TEST_REDIS_PORT: 6379
+              run: go test -tags=integration -v ./internal/service/...
+            
