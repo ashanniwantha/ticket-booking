@@ -73,7 +73,7 @@ jobs:
                 TEST_DB_PORT: 5432
                 TEST_REDIS_HOST: localhost
                 TEST_REDIS_PORT: 6379
-              run: go test -tags=integration -v ./internal/service/...
+              run: go test -tags=integration -v -count=1 ./internal/service/...
     
     build:
         needs: test
